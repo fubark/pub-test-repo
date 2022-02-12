@@ -94,7 +94,6 @@ jobs:
         run: |
           wget https://ziglang.org/download/0.9.0/zig-linux-x86_64-0.9.0.tar.xz --no-check-certificate -q
           tar -xf zig-linux-x86_64-0.9.0.tar.xz
-          ./zig-linux-x86_64-0.9.0/zig
 
       - name: Get version.
         if: env.BUILD_TARGET != 'x86_64-windows-gnu'
