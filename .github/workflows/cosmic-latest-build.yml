@@ -103,14 +103,6 @@ jobs:
           zig build version > version 2>&1
           echo ::set-output name=version::`cat version`
 
-      - name: Get version. (windows)
-        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
-        id: version
-        shell: wsl-bash {0}
-        run: |
-          zig build version > version 2>&1
-          echo ::set-output name=version::`cat version`
-
       - name: Cache.
         uses: actions/cache@v2
         with:
