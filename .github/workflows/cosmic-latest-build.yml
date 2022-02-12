@@ -1,0 +1,259 @@
+name: Latest Build
+
+on: 
+  workflow_dispatch:
+    inputs:
+      deps_rev_override:
+        description: 'Deps Revision Override'
+        type: string
+        default: ''
+        required: false
+  push:
+    branches:
+      - master
+# Cancel previous job if it's running.
+# Normally softprops/turnstyle would be enough but waiting for the job to finish somehow acquires a lock preventing the original
+# job from recreating the "latest" tag which we need to do to refresh the release created date. See below.
+concurrency:
+  group: latest
+  cancel-in-progress: true
+jobs:  
+  build:
+    name: host=${{ matrix.config.host }} target=${{ matrix.config.target }} mode=${{ matrix.config.mode }}
+    runs-on: ${{ matrix.config.host }}
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          - host: ubuntu-20.04
+            target: x86_64-linux-gnu
+            mode: release
+          - host: macos-11
+            target: x86_64-macos-gnu
+            mode: release
+          - host: macos-11
+            target: aarch64-macos-gnu
+            mode: release
+          - host: windows-2019
+            target: x86_64-windows-gnu
+            mode: release
+          # - host: windows-2019
+          #  target: x86_64-windows-msvc
+          #  mode: release
+    env:
+      BIN_ZIP: >-
+        ${{ fromJson('{
+          "x86_64-windows-gnu": "cosmic-windows-x64.zip",
+          "x86_64-linux-gnu": "cosmic-linux-x64.zip",
+          "x86_64-macos-gnu": "cosmic-macos-x64.zip",
+          "aarch64-macos-gnu": "cosmic-macos-arm64.zip",
+        }')[matrix.config.target] }}
+      ZIG_TARGET_FLAG: >-
+        ${{ fromJson('{
+          "x86_64-windows-gnu": "-Dtarget=x86_64-windows-gnu -Dcpu=baseline",
+          "x86_64-linux-gnu": "-Dtarget=x86_64-linux-gnu -Dcpu=baseline",
+          "x86_64-macos-gnu": "-Dtarget=x86_64-macos.10.13-gnu -Dcpu=baseline",
+          "aarch64-macos-gnu": "-Dtarget=aarch64-macos.11-gnu -Dcpu=baseline",
+        }')[matrix.config.target] }}
+      BUILD_HOST: ${{ matrix.config.host }}
+      BUILD_TARGET: ${{ matrix.config.target }}
+      BUILD_MODE: ${{ matrix.config.mode }}
+      BIN_NAME: cosmic
+      BIN_EXT: ${{ contains(matrix.config.target, 'windows') && '.exe' || '' }}
+      ZIG_MODE_FLAG: ${{ (matrix.config.mode == 'release' && '-Drelease-safe') || '' }}
+    steps:
+      - name: Install Linux deps.
+        if: env.BUILD_HOST == 'ubuntu-20.04' && env.BUILD_TARGET == 'x86_64-linux-gnu'
+        run: |
+          sudo add-apt-repository -y "deb http://archive.ubuntu.com/ubuntu `lsb_release -sc` main universe restricted multiverse"
+          sudo apt-get update -y -qq
+          sudo apt-get install libx11-dev libxcursor-dev libxi-dev libxrandr-dev libxinerama-dev libxxf86vm-dev libxss-dev libgl1-mesa-dev
+
+      - name: Setup WSL (windows)
+        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
+        uses: Vampire/setup-wsl@v1
+        with:
+         additional-packages: wget tar
+
+      - name: Clone repo.
+        uses: actions/checkout@v2
+        with:
+          repository: fubark/cosmic
+          ref: 'windows-test-and-pr-ci'
+          fetch-depth: 1
+          #submodules: recursive
+
+      - name: Install zig.
+        if: env.BUILD_TARGET != 'x86_64-windows-gnu'
+        uses: goto-bus-stop/setup-zig@v1
+        with:
+          version: 0.9.0
+
+      - name: Install zig. (windows)
+        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
+        shell: wsl-bash {0}
+        run: |
+          wget https://ziglang.org/download/0.9.0/zig-linux-x86_64-0.9.0.tar.xz --no-check-certificate
+          tar -xf zig.tar.xz
+          sudo ln -s ./zig-linux-x86_64-0.9.0/zig /usr/local/bin/zig
+
+      - name: Get version.
+        id: version
+        run: |
+          zig build version > version 2>&1
+          echo ::set-output name=version::`cat version`
+
+      - name: Cache.
+        uses: actions/cache@v2
+        with:
+          path: |-
+            ~/.cache/zig
+            zig-cache
+          key:
+            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}
+          restore-keys:
+            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}
+
+      - name: Get deps.
+        run: zig build get-deps ${{ (github.event.inputs.deps_rev_override && format('-Ddeps-rev="{0}"', github.event.inputs.deps_rev_override)) || '' }}
+
+      - name: Get prebuilt v8.
+        run: zig build get-v8-lib ${{ env.ZIG_TARGET_FLAG }}
+
+      # Test core does not build external libs. It's nice to surface problems with the codebase first before doing a full build.
+      - name: Test core.
+        if: (env.BUILD_TARGET != 'aarch64-macos-gnu' && env.BUILD_TARGET != 'x86_64-windows-gnu')
+        run: zig build test ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
+
+      - name: Build test. (windows)
+        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
+        shell: wsl-bash {0}
+        run: zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
+
+      - name: Test core. (windows)
+        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
+        run: ./zig-out/${{ env.BUILD_TARGET }}/main_test/main_test.exe test/main_test.zig
+
+      - name: Build.
+        if: env.BUILD_TARGET != 'x86_64-windows-gnu'
+        run: zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
+
+      - name: Build. (windows)
+        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
+        shell: wsl-bash {0}
+        run: zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
+
+      - name: Test js.
+        if: (env.BUILD_TARGET != 'aarch64-macos-gnu' && env.BUILD_TARGET != 'x86_64-windows-gnu')
+        run: zig build test-cosmic-js ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
+
+      - name: Test js. (windows)
+        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
+        run: ./zig-out/${{ env.BUILD_TARGET }}/main/main.exe test/js/test.js
+
+      # Remove when zig strip is fixed.
+      - name: Strip (Linux)
+        if: env.BUILD_TARGET == 'x86_64-linux-gnu' && env.BUILD_MODE == 'release'
+        run: |
+          strip zig-out/${{ env.BUILD_TARGET }}/main/main
+
+      # Don't strip aarch64 since it was already code signed.
+      # TODO: Look for way to make zig strip before doing the codesign.
+      - name: Strip (macOS)
+        if: env.BUILD_TARGET == 'x86_64-macos-gnu' && env.BUILD_MODE == 'release'
+        run: |
+          strip zig-out/${{ env.BUILD_TARGET }}/main/main
+
+      # Currently just ad hoc signing.
+      # aarch64 build is automatically signed by zig.
+      - name: Codesign (macOS)
+        if: env.BUILD_TARGET == 'x86_64-macos-gnu' && env.BUILD_MODE == 'release'
+        run: |
+          codesign --force --deep -s - zig-out/${{ env.BUILD_TARGET }}/main/main
+
+      - name: Copy binary.
+        run: cp
+          zig-out/${{ env.BUILD_TARGET }}/main/main${{ env.BIN_EXT }}
+          zig-out/${{ env.BUILD_TARGET }}/main/cosmic${{ env.BIN_EXT }}
+
+      - name: Zip. (linux/macos)
+        if: env.BUILD_HOST == 'ubuntu-20.04' || env.BUILD_HOST == 'macos-11'
+        run: |
+          (cd zig-out/${{ env.BUILD_TARGET }}/main && zip - cosmic${{env.BIN_EXT}}) > ${{ env.BIN_ZIP }}
+
+      # To update the release create date, we need to recreate the latest tag.
+      - name: Update latest tag.
+        uses: actions/github-script@v5
+        with:
+          script: |
+            const ref = 'tags/latest';
+            const res = await github.rest.git.listMatchingRefs({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'tags/latest',
+            });
+            if (res.data.length > 0) {
+              await github.rest.git.updateRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: 'tags/latest',
+                sha: context.sha,
+              });
+              /*await github.rest.git.deleteRef({
+                 owner: context.repo.owner,
+                 repo: context.repo.repo,
+                 ref: 'tags/latest',
+                 sha: context.sha,
+              });*/
+            } else {
+              await github.rest.git.createRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                // Only create needs full path
+                ref: 'refs/tags/latest',
+                sha: context.sha,
+              });
+            }
+
+      - name: Get current time.
+        uses: josStorer/get-current-time@v2
+        id: time
+
+      - name: Github Release.
+        uses: softprops/action-gh-release@v0.1.14
+        # Github requires tags for releases.
+        #if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          body: |
+            Certified, latest development build.
+
+            Last updated: ${{ steps.time.outputs.readableTime }}
+          name: ${{ steps.version.outputs.version }}
+          tag_name: latest
+          prerelease: false
+          draft: false
+          files: ${{ env.BIN_ZIP }}
+
+      # After the recreate tag hack, the old release might still be there but marked as draft. Find it and delete it.
+      # - name: Clean up stale releases.
+      #   uses: actions/github-script@v5
+      #   with:
+      #     script: |
+      #       const res = await github.rest.repos.listReleases({
+      #         owner: context.repo.owner,
+      #         repo: context.repo.repo,
+      #       });
+      #       if (res.data.length > 0) {
+      #         for (let i = 0; i < res.data.length; i++) {
+      #           const item = res.data[i];
+      #           if (item.tag_name == 'latest' && item.draft) {
+      #             await github.rest.repos.deleteRelease({
+      #               owner: context.repo.owner,
+      #               repo: context.repo.repo,
+      #               release_id: item.id,
+      #             });
+      #           }
+      #         }
+      #       }
