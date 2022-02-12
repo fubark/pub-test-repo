@@ -73,7 +73,7 @@ jobs:
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
         uses: Vampire/setup-wsl@v1
         with:
-         additional-packages: wget tar
+         additional-packages: wget tar xz-utils
 
       - name: Clone repo.
         uses: actions/checkout@v2
