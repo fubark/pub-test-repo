@@ -92,12 +92,9 @@ jobs:
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
         shell: wsl-bash {0}
         run: |
-          wget https://ziglang.org/download/0.9.0/zig-linux-x86_64-0.9.0.tar.xz --no-check-certificate
+          wget https://ziglang.org/download/0.9.0/zig-linux-x86_64-0.9.0.tar.xz --no-check-certificate -q
           tar -xf zig-linux-x86_64-0.9.0.tar.xz
-          sudo ln -s ./zig-linux-x86_64-0.9.0/zig /usr/bin/zig
-          which wget
           ./zig-linux-x86_64-0.9.0/zig
-          which zig
 
       - name: Get version.
         if: env.BUILD_TARGET != 'x86_64-windows-gnu'
@@ -131,7 +128,7 @@ jobs:
       - name: Build test. (windows)
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
         shell: wsl-bash {0}
-        run: zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
+        run: ./zig-linux-x86_64-0.9.0/zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
 
       - name: Test core. (windows)
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
@@ -144,7 +141,7 @@ jobs:
       - name: Build. (windows)
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
         shell: wsl-bash {0}
-        run: zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
+        run: ./zig-linux-x86_64-0.9.0/zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
 
       - name: Test js.
         if: (env.BUILD_TARGET != 'aarch64-macos-gnu' && env.BUILD_TARGET != 'x86_64-windows-gnu')
