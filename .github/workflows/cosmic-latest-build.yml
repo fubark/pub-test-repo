@@ -127,7 +127,7 @@ jobs:
       - name: Build test. (windows)
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
         shell: wsl-bash {0}
-        run: ./zig-linux-x86_64-0.9.0/zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
+        run: ./zig-linux-x86_64-0.9.0/zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }} -Dwsl
 
       - name: Test core. (windows)
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
@@ -140,7 +140,7 @@ jobs:
       - name: Build. (windows)
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
         shell: wsl-bash {0}
-        run: ./zig-linux-x86_64-0.9.0/zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
+        run: ./zig-linux-x86_64-0.9.0/zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }} -Dwsl
 
       - name: Test js.
         if: (env.BUILD_TARGET != 'aarch64-macos-gnu' && env.BUILD_TARGET != 'x86_64-windows-gnu')
