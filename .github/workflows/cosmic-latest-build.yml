@@ -127,11 +127,11 @@ jobs:
       - name: Build test. (windows)
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
         shell: wsl-bash {0}
-        run: ./zig-linux-x86_64-0.9.0/zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }} -Dwsl
+        run: ./zig-linux-x86_64-0.9.0/zig build test-exe ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }} -Dwsl
 
       - name: Test core. (windows)
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
-        run: zig-out/${{ env.BUILD_TARGET }}/main_test/main_test.exe test/main_test.zig
+        run: ./zig-out/${{ env.BUILD_TARGET }}/main_test/main_test.exe test/main_test.zig
 
       - name: Build.
         if: env.BUILD_TARGET != 'x86_64-windows-gnu'
@@ -148,7 +148,7 @@ jobs:
 
       - name: Test js. (windows)
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
-        run: zig-out/${{ env.BUILD_TARGET }}/main/main.exe test/js/test.js
+        run: ./zig-out/${{ env.BUILD_TARGET }}/main/main.exe test/js/test.js
 
       # Remove when zig strip is fixed.
       - name: Strip (Linux)
