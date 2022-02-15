@@ -100,16 +100,18 @@ jobs:
           zig build version > version 2>&1
           echo "BUILD_VERSION=$(cat version)" >> $env:GITHUB_ENV
 
+      # Override zig global cache dir has problems on windows so just save default windows dir. (windows build needs the same global cache for subsequent builds)
       - name: Cache.
         uses: actions/cache@v2
         with:
           path: |-
             ~/.cache/zig
             zig-cache
+            ~/AppData/Local/zig
           key:
-            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}
+            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-4
           restore-keys:
-            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}
+            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-4
 
       - name: Get deps.
         run: zig build get-deps ${{ (github.event.inputs.deps_rev_override && format('-Ddeps-rev="{0}"', github.event.inputs.deps_rev_override)) || '' }}
