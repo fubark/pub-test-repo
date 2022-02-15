@@ -51,7 +51,7 @@ jobs:
       # The cache action needs to save the global cache on windows or it have issues in subsequent builds.
       ZIG_TARGET_FLAG: >-
         ${{ fromJson('{
-          "x86_64-windows-gnu": "-Dtarget=x86_64-windows-gnu -Dcpu=baseline --global-cache-dir ./zig-global-cache",
+          "x86_64-windows-gnu": "-Dtarget=x86_64-windows-gnu -Dcpu=baseline --global-cache-dir zig-global-cache",
           "x86_64-linux-gnu": "-Dtarget=x86_64-linux-gnu -Dcpu=baseline",
           "x86_64-macos-gnu": "-Dtarget=x86_64-macos.10.13-gnu -Dcpu=baseline",
           "aarch64-macos-gnu": "-Dtarget=aarch64-macos.11-gnu -Dcpu=baseline",
@@ -109,9 +109,9 @@ jobs:
             zig-cache
             zig-global-cache
           key:
-            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-2
+            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-3
           restore-keys:
-            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-2
+            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-3
 
       - name: Get deps.
         run: zig build get-deps ${{ (github.event.inputs.deps_rev_override && format('-Ddeps-rev="{0}"', github.event.inputs.deps_rev_override)) || '' }}
