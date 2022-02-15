@@ -73,7 +73,7 @@ jobs:
         if: env.BUILD_TARGET == 'x86_64-windows-gnu'
         uses: Vampire/setup-wsl@v1
         with:
-         additional-packages: wget tar xz-utils
+         additional-packages: wget tar xz-utils zip
 
       - name: Clone repo.
         uses: actions/checkout@v2
@@ -88,15 +88,7 @@ jobs:
         with:
           version: 0.9.0
 
-      - name: Install zig. (windows)
-        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
-        shell: wsl-bash {0}
-        run: |
-          wget https://ziglang.org/download/0.9.0/zig-linux-x86_64-0.9.0.tar.xz --no-check-certificate -q
-          tar -xf zig-linux-x86_64-0.9.0.tar.xz
-
       - name: Get version.
-        if: env.BUILD_TARGET != 'x86_64-windows-gnu'
         id: version
         run: |
           zig build version > version 2>&1
@@ -121,34 +113,16 @@ jobs:
 
       # Test core does not build external libs. It's nice to surface problems with the codebase first before doing a full build.
       - name: Test core.
-        if: (env.BUILD_TARGET != 'aarch64-macos-gnu' && env.BUILD_TARGET != 'x86_64-windows-gnu')
+        if: env.BUILD_TARGET != 'aarch64-macos-gnu'
         run: zig build test ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
-
-      - name: Build test. (windows)
-        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
-        shell: wsl-bash {0}
-        run: ./zig-linux-x86_64-0.9.0/zig build test-exe ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }} -Dwsl
-
-      - name: Test core. (windows)
-        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
-        run: ./zig-out/${{ env.BUILD_TARGET }}/main_test/main_test.exe test/main_test.zig
 
       - name: Build.
         if: env.BUILD_TARGET != 'x86_64-windows-gnu'
         run: zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
 
-      - name: Build. (windows)
-        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
-        shell: wsl-bash {0}
-        run: ./zig-linux-x86_64-0.9.0/zig build cosmic ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }} -Dwsl
-
       - name: Test js.
-        if: (env.BUILD_TARGET != 'aarch64-macos-gnu' && env.BUILD_TARGET != 'x86_64-windows-gnu')
+        if: env.BUILD_TARGET != 'aarch64-macos-gnu'
         run: zig build test-cosmic-js ${{ env.ZIG_MODE_FLAG }} ${{ env.ZIG_TARGET_FLAG }}
-
-      - name: Test js. (windows)
-        if: env.BUILD_TARGET == 'x86_64-windows-gnu'
-        run: ./zig-out/${{ env.BUILD_TARGET }}/main/main.exe test/js/test.js
 
       # Remove when zig strip is fixed.
       - name: Strip (Linux)
@@ -177,6 +151,12 @@ jobs:
 
       - name: Zip. (linux/macos)
         if: env.BUILD_HOST == 'ubuntu-20.04' || env.BUILD_HOST == 'macos-11'
+        run: |
+          (cd zig-out/${{ env.BUILD_TARGET }}/main && zip - cosmic${{env.BIN_EXT}}) > ${{ env.BIN_ZIP }}
+
+      - name: Zip. (windows)
+        if: env.BUILD_HOST == 'windows-2019'
+        shell: wsl-bash {0}
         run: |
           (cd zig-out/${{ env.BUILD_TARGET }}/main && zip - cosmic${{env.BIN_EXT}}) > ${{ env.BIN_ZIP }}
 
