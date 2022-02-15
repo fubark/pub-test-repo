@@ -48,10 +48,9 @@ jobs:
           "x86_64-macos-gnu": "cosmic-macos-x64.zip",
           "aarch64-macos-gnu": "cosmic-macos-arm64.zip",
         }')[matrix.config.target] }}
-      # The cache action needs to save the global cache on windows or it have issues in subsequent builds.
       ZIG_TARGET_FLAG: >-
         ${{ fromJson('{
-          "x86_64-windows-gnu": "-Dtarget=x86_64-windows-gnu -Dcpu=baseline --global-cache-dir zig-global-cache",
+          "x86_64-windows-gnu": "-Dtarget=x86_64-windows-gnu -Dcpu=baseline",
           "x86_64-linux-gnu": "-Dtarget=x86_64-linux-gnu -Dcpu=baseline",
           "x86_64-macos-gnu": "-Dtarget=x86_64-macos.10.13-gnu -Dcpu=baseline",
           "aarch64-macos-gnu": "-Dtarget=aarch64-macos.11-gnu -Dcpu=baseline",
@@ -101,17 +100,18 @@ jobs:
           zig build version > version 2>&1
           echo "BUILD_VERSION=$(cat version)" >> $env:GITHUB_ENV
 
+      # Override zig global cache dir has problems on windows so just save default windows dir. (windows build needs the same global cache for subsequent builds)
       - name: Cache.
         uses: actions/cache@v2
         with:
           path: |-
             ~/.cache/zig
             zig-cache
-            zig-global-cache
+            ~/AppData/Local/zig
           key:
-            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-3
+            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-4
           restore-keys:
-            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-3
+            build-${{ env.BUILD_TARGET }}-${{ env.BUILD_MODE }}-4
 
       - name: Get deps.
         run: zig build get-deps ${{ (github.event.inputs.deps_rev_override && format('-Ddeps-rev="{0}"', github.event.inputs.deps_rev_override)) || '' }}
