@@ -173,6 +173,8 @@ jobs:
           name: bin
           path: |
             ${{ env.BIN_ZIP }}
+    outputs:
+      version: ${{ env.BUILD_VERSION }}
 
   release:
     needs: build
@@ -189,7 +191,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           automatic_release_tag: latest
           prerelease: false
-          title: ${{ env.BUILD_VERSION }}
+          title: ${{ needs.build.outputs.version }}
           files: |
             cosmic-windows-x64.zip
             cosmic-linux-x64.zip
