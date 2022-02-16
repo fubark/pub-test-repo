@@ -167,6 +167,21 @@ jobs:
         run: |
           (cd zig-out/${{ env.BUILD_TARGET }}/main && zip - cosmic${{env.BIN_EXT}}) > ${{ env.BIN_ZIP }}
 
+      - name: Save artifact.
+        uses: actions/upload-artifact@v2
+        with:
+          path: |
+            ${{ env.BIN_ZIP }}
+
+  release:
+    needs: build
+    name: Release
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: bin
+
       - name: Github Release.
         uses: marvinpinto/action-automatic-releases@latest
         with:
@@ -175,4 +190,7 @@ jobs:
           prerelease: false
           title: ${{ env.BUILD_VERSION }}
           files: |
-            ${{ env.BIN_ZIP }}
+            cosmic-windows-x64.zip
+            cosmic-linux-x64.zip
+            cosmic-macos-x64.zip
+            cosmic-macos-arm64.zip
